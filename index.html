@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Varsity Admission Batch 26 - Portal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- Firebase Services -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
+    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
+    import { getFirestore, doc, setDoc, getDocs, collection, onSnapshot, updateDoc } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+
+    // YOUR EXACT FIREBASE CONFIGURATION
+    const firebaseConfig = {
+      apiKey: "AIzaSyC3H7jNADw534DVBV8rQLZ2oSw0-oyybLA",
+      authDomain: "admission-batch-26.firebaseapp.com",
+      projectId: "admission-batch-26",
+      storageBucket: "admission-batch-26.firebasestorage.app",
+      messagingSenderId: "65819980844",
+      appId: "1:65819980844:web:32aaa01cb0dbc68a408d89",
+      measurementId: "G-42N9TXP7DG"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    let courseData = [];
+    let currentUnsubscribe = null;
+
+    // --- ANTI-ACCOUNT SHARING LOGIC ---
+    onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        currentUnsubscribe = onSnapshot(doc(db, "students", user.uid), (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            const dbSession = data.currentSessionId;
+            const localSession = localStorage.getItem("mySecureSession");
+
+            // DEVICE KICK-OUT CHECK
+            if (dbSession && dbSession !== localSession) {
+              alert("SECURITY ALERT: Your account was logged in from another device. You have been disconnected.");
+              signOut(auth);
+              return;
+            }
+
+            // Access Gatekeeper
+            if (data.status === "APPROVED") {
+              showCourseView();
+              loadSecureClasses();
+            } else {
+              showPendingView(data.trxId || "Pending confirmation");
+            }
+          }
+        });
+      } else {
+        if(currentUnsubscribe) currentUnsubscribe();
+        showAuthView();
+      }
+    });
+
+    window.handleSignUp = async () => {
+      const email = document.getElementById("reg-email").value.trim();
+      const pass = document.getElementById("reg-pass").value;
+      const name = document.getElementById("reg-name").value.trim();
+      const trxId = document.getElementById("reg-trx").value.trim();
+      if (!email || !pass || !name || !trxId) return alert("Fill all fields!");
+
+      try {
+        const res = await createUserWithEmailAndPassword(auth, email, pass);
+        const newSession = crypto.randomUUID();
+        localStorage.setItem("mySecureSession", newSession);
+        
+        await setDoc(doc(db, "students", res.user.uid), {
+          name, email, trxId, status: "PENDING", currentSessionId: newSession
+        });
+      } catch (err) { alert(err.message); }
+    };
+
+    window.handleLogin = async () => {
+      const email = document.getElementById("login-email").value.trim();
+      const pass = document.getElementById("login-pass").value;
+      try {
+        const res = await signInWithEmailAndPassword(auth, email, pass);
+        const newSession = crypto.randomUUID();
+        localStorage.setItem("mySecureSession", newSession);
+        await updateDoc(doc(db, "students", res.user.uid), { currentSessionId: newSession });
+      } catch (err) { alert(err.message); }
+    };
+
+    window.handleLogout = () => signOut(auth);
+
+    async function loadSecureClasses() {
+      try {
+        const querySnapshot = await getDocs(collection(db, "classes"));
+        courseData = [];
+        querySnapshot.forEach((doc) => { courseData.push(doc.data()); });
+        renderSubjects();
+      } catch (error) {
+        console.error("Access Denied or Database Empty", error);
+      }
+    }
+
+    window.courseData = () => courseData;
+  </script>
+</head>
+
+<body class="bg-[#0b1121] text-slate-100 min-h-screen font-sans">
+  <nav class="bg-[#151e32] border-b border-slate-800 px-6 py-4 flex justify-between items-center sticky top-0 z-40">
+    <div class="flex items-center space-x-3">
+      <span class="bg-gradient-to-r from-red-600 to-pink-600 text-white font-bold px-3 py-1 rounded text-sm tracking-wider">ACS CLONE</span>
+      <h1 class="text-lg font-bold hidden sm:block">Varsity Admission Batch 26</h1>
+    </div>
+    <div id="nav-actions" class="hidden">
+      <button onclick="handleLogout()" class="text-sm bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg border border-slate-700">Logout</button>
+    </div>
+  </nav>
+
+  <div id="view-auth" class="max-w-md mx-auto mt-12 p-6 bg-[#151e32] rounded-xl border border-slate-800 shadow-2xl">
+    <div class="flex border-b border-slate-700 mb-6">
+      <button onclick="toggleAuthTab('login')" id="tab-login" class="flex-1 py-2 font-bold text-red-500 border-b-2 border-red-500">Login</button>
+      <button onclick="toggleAuthTab('signup')" id="tab-signup" class="flex-1 py-2 font-bold text-slate-500">Register</button>
+    </div>
+    
+    <div id="form-login" class="space-y-4">
+      <input id="login-email" type="email" placeholder="Gmail Address" class="w-full bg-[#0b1121] border border-slate-700 rounded p-3 text-white">
+      <input id="login-pass" type="password" placeholder="Password" class="w-full bg-[#0b1121] border border-slate-700 rounded p-3 text-white">
+      <button onclick="handleLogin()" class="w-full bg-red-600 hover:bg-red-700 font-bold py-3 rounded-lg">Enter Course</button>
+    </div>
+
+    <div id="form-signup" class="space-y-4 hidden">
+      <input id="reg-name" type="text" placeholder="Full Name" class="w-full bg-[#0b1121] border border-slate-700 rounded p-3 text-white">
+      <input id="reg-email" type="email" placeholder="Gmail Address" class="w-full bg-[#0b1121] border border-slate-700 rounded p-3 text-white">
+      <input id="reg-pass" type="password" placeholder="Set Password" class="w-full bg-[#0b1121] border border-slate-700 rounded p-3 text-white">
+      <input id="reg-trx" type="text" placeholder="bKash/Nagad TrxID" class="w-full bg-[#0b1121] border border-slate-700 rounded p-3 text-white">
+      <button onclick="handleSignUp()" class="w-full bg-emerald-600 hover:bg-emerald-700 font-bold py-3 rounded-lg">Register & Pay</button>
+    </div>
+  </div>
+
+  <div id="view-pending" class="hidden max-w-lg mx-auto mt-16 p-8 bg-[#151e32] rounded-2xl border border-amber-600/40 text-center">
+    <h2 class="text-xl font-bold mb-2 text-amber-400">Waiting for Admin Approval</h2>
+    <p class="text-slate-400 text-sm mb-4">TrxID: <span id="pending-trx" class="text-white font-mono"></span><br>Access will be granted once your payment is manually verified.</p>
+  </div>
+
+  <div id="view-course" class="hidden max-w-7xl mx-auto px-4 py-8">
+    <div id="breadcrumb" class="text-sm text-slate-400 mb-6 flex items-center space-x-2">
+      <span class="text-red-400 cursor-pointer hover:underline" onclick="renderSubjects()">Subjects</span>
+      <span id="bc-subject-divider" class="hidden">/</span>
+      <span id="bc-subject" class="text-slate-200"></span>
+    </div>
+
+    <div id="subjects-container" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6"></div>
+    <div id="chapters-container" class="hidden space-y-4"></div>
+  </div>
+
+  <div id="video-modal" class="hidden fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
+    <div id="modal-box" class="bg-[#151e32] border border-slate-700 rounded-2xl overflow-hidden w-full max-w-4xl shadow-2xl transition-all">
+      <div class="px-5 py-4 border-b border-slate-800 flex justify-between items-center bg-[#0b1121]">
+        <h3 id="modal-class-title" class="font-bold text-slate-200 truncate pr-4"></h3>
+        <div class="flex space-x-4">
+          <button onclick="togglePlayerSize()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-expand"></i></button>
+          <button onclick="closeVideoModal()" class="text-slate-400 hover:text-red-500 text-xl"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+      </div>
+
+      <div class="relative w-full aspect-video bg-black">
+        <iframe id="video-iframe" class="w-full h-full" src="" frameborder="0" allowfullscreen></iframe>
+      </div>
+
+      <div class="p-4 grid grid-cols-3 gap-3 bg-[#151e32]">
+        <a id="btn-lecture" href="#" target="_blank" class="flex flex-col items-center justify-center py-3 rounded-lg bg-blue-900/30 border border-blue-700/50 hover:bg-blue-600 text-blue-400 hover:text-white transition">
+          <i class="fa-solid fa-file-pdf mb-1 text-lg"></i><span class="text-xs font-bold">Lecture Sheet</span>
+        </a>
+        <a id="btn-question" href="#" target="_blank" class="flex flex-col items-center justify-center py-3 rounded-lg bg-amber-900/30 border border-amber-700/50 hover:bg-amber-600 text-amber-400 hover:text-white transition">
+          <i class="fa-solid fa-file-circle-question mb-1 text-lg"></i><span class="text-xs font-bold">Question PDF</span>
+        </a>
+        <a id="btn-answer" href="#" target="_blank" class="flex flex-col items-center justify-center py-3 rounded-lg bg-emerald-900/30 border border-emerald-700/50 hover:bg-emerald-600 text-emerald-400 hover:text-white transition">
+          <i class="fa-solid fa-file-circle-check mb-1 text-lg"></i><span class="text-xs font-bold">Answer PDF</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.toggleAuthTab = (type) => {
+      if (type === 'login') {
+        document.getElementById("tab-login").className = "flex-1 py-2 font-bold text-red-500 border-b-2 border-red-500";
+        document.getElementById("tab-signup").className = "flex-1 py-2 font-bold text-slate-500";
+        document.getElementById("form-login").classList.remove("hidden");
+        document.getElementById("form-signup").classList.add("hidden");
+      } else {
+        document.getElementById("tab-signup").className = "flex-1 py-2 font-bold text-emerald-500 border-b-2 border-emerald-500";
+        document.getElementById("tab-login").className = "flex-1 py-2 font-bold text-slate-500";
+        document.getElementById("form-signup").classList.remove("hidden");
+        document.getElementById("form-login").classList.add("hidden");
+      }
+    };
+
+    function showAuthView() { document.getElementById("view-auth").classList.remove("hidden"); document.getElementById("view-pending").classList.add("hidden"); document.getElementById("view-course").classList.add("hidden"); document.getElementById("nav-actions").classList.add("hidden"); }
+    function showPendingView(trxId) { document.getElementById("view-auth").classList.add("hidden"); document.getElementById("view-pending").classList.remove("hidden"); document.getElementById("pending-trx").innerText = trxId; document.getElementById("view-course").classList.add("hidden"); document.getElementById("nav-actions").classList.remove("hidden"); }
+    function showCourseView() { document.getElementById("view-auth").classList.add("hidden"); document.getElementById("view-pending").classList.add("hidden"); document.getElementById("view-course").classList.remove("hidden"); document.getElementById("nav-actions").classList.remove("hidden"); }
+
+    window.renderSubjects = () => {
+      document.getElementById("bc-subject-divider").classList.add("hidden");
+      document.getElementById("bc-subject").innerText = "";
+      document.getElementById("chapters-container").classList.add("hidden");
+      
+      const container = document.getElementById("subjects-container");
+      container.classList.remove("hidden");
+      container.innerHTML = "";
+
+      const uniqueSubjects = [...new Set(window.courseData().map(c => c.subject))];
+
+      uniqueSubjects.forEach(sub => {
+        const card = document.createElement("div");
+        card.className = "bg-[#151e32] border border-slate-700 hover:border-red-500 rounded-xl p-6 cursor-pointer transform hover:-translate-y-1 transition group";
+        card.innerHTML = `
+          <div class="w-12 h-12 bg-red-500/10 text-red-500 group-hover:bg-red-500 group-hover:text-white rounded-lg flex items-center justify-center text-xl mb-4"><i class="fa-solid fa-book-open"></i></div>
+          <h3 class="font-bold text-lg">${sub}</h3>
+        `;
+        card.onclick = () => renderChapters(sub);
+        container.appendChild(card);
+      });
+    };
+
+    window.renderChapters = (subjectName) => {
+      document.getElementById("subjects-container").classList.add("hidden");
+      const container = document.getElementById("chapters-container");
+      container.classList.remove("hidden");
+      container.innerHTML = "";
+      document.getElementById("bc-subject-divider").classList.remove("hidden");
+      document.getElementById("bc-subject").innerText = subjectName;
+
+      const subjectClasses = window.courseData().filter(c => c.subject === subjectName);
+      const uniqueChapters = [...new Set(subjectClasses.map(c => c.chapter))];
+
+      uniqueChapters.forEach(chap => {
+        const chapClasses = subjectClasses.filter(c => c.chapter === chap);
+        const chapBox = document.createElement("div");
+        chapBox.className = "bg-[#151e32] border border-slate-700 rounded-xl overflow-hidden";
+        
+        let classListHtml = chapClasses.map(cls => `
+          <div class="flex items-center justify-between p-4 hover:bg-slate-800 border-t border-slate-700/50">
+            <div class="flex items-center space-x-3">
+              <span class="w-8 h-8 rounded-full bg-red-500/20 text-red-500 flex items-center justify-center text-xs"><i class="fa-solid fa-play"></i></span>
+              <span class="text-sm font-medium">${cls.class_title}</span>
+            </div>
+            <button onclick='openVideoModal(${JSON.stringify(cls)})' class="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-4 py-2 rounded-md">Watch</button>
+          </div>
+        `).join('');
+
+        chapBox.innerHTML = `<div class="p-4 bg-[#111827] font-bold border-l-4 border-red-500">${chap}</div><div class="divide-y divide-slate-800">${classListHtml}</div>`;
+        container.appendChild(chapBox);
+      });
+    };
+
+    window.openVideoModal = (cls) => {
+      document.getElementById("modal-class-title").innerText = cls.class_title;
+      document.getElementById("video-iframe").src = `https://www.youtube.com/embed/${cls.youtube_id}?autoplay=1&rel=0&modestbranding=1`;
+      document.getElementById("btn-lecture").href = cls.lecture_pdf || "#";
+      document.getElementById("btn-question").href = cls.question_pdf || "#";
+      document.getElementById("btn-answer").href = cls.answer_pdf || "#";
+      document.getElementById("video-modal").classList.remove("hidden");
+    };
+
+    window.closeVideoModal = () => {
+      document.getElementById("video-iframe").src = "";
+      document.getElementById("video-modal").classList.add("hidden");
+    };
+
+    let isFullScreen = false;
+    window.togglePlayerSize = () => {
+      const modalBox = document.getElementById("modal-box");
+      if (!isFullScreen) {
+        modalBox.className = "bg-[#151e32] border border-slate-700 rounded-none w-screen h-screen max-w-none flex flex-col justify-between";
+      } else {
+        modalBox.className = "bg-[#151e32] border border-slate-700 rounded-2xl overflow-hidden w-full max-w-4xl shadow-2xl";
+      }
+      isFullScreen = !isFullScreen;
+    };
+  </script>
+</body>
+</html>
