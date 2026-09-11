@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Varsity Admission Batch 26</title>
   
-  <!-- PWA Connections -->
+  <!-- PWA Connections for App Installation -->
   <link rel="manifest" href="./manifest.json">
   <meta name="theme-color" content="#0b1121">
   <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2997/2997300.png">
@@ -14,7 +14,6 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
   <style>
-    /* Custom Scrollbar */
     ::-webkit-scrollbar { width: 8px; }
     ::-webkit-scrollbar-track { background: #0b1121; }
     ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
@@ -45,7 +44,7 @@
     let currentUnsubscribe = null;
     window.isAuthAction = false; 
 
-    // Register PWA Service Worker safely
+    // Register PWA Service Worker (App Install)
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW setup failed: ', err));
@@ -54,7 +53,8 @@
 
     const generateSessionToken = () => Date.now().toString(36) + Math.random().toString(36).substring(2);
 
-    // --- ROCK-SOLID ANTI-ACCOUNT SHARING & FAST RESTORE ---
+    // --- ROCK-SOLID ANTI-ACCOUNT SHARING ---
+    // Instantly kicks out old browser tabs OR old app logins
     onAuthStateChanged(auth, async (user) => {
       if (user) {
         currentUnsubscribe = onSnapshot(doc(db, "students", user.uid), (docSnap) => {
@@ -63,7 +63,6 @@
             const dbSession = data.currentSessionId;
             const localSession = localStorage.getItem("mySecureSession");
 
-            // KICK-OUT TRIGGER
             if (dbSession && dbSession !== localSession && !window.isAuthAction) {
               sessionStorage.removeItem("courseNavState"); 
               alert("SECURITY ALERT: Your account was logged in from another device. You have been disconnected.");
@@ -201,11 +200,24 @@
   <!-- Main Course Container -->
   <div id="view-course" class="hidden max-w-6xl mx-auto px-4 py-8 relative min-h-screen">
     
+    <!-- STATE 1: Subjects Dashboard with Global Search -->
     <div id="state-subjects" class="hidden">
-      <h2 class="text-center text-slate-300 font-medium tracking-widest mb-8 uppercase text-sm">Subjects</h2>
+      <!-- Global Search Bar -->
+      <div class="mb-10 relative max-w-2xl mx-auto z-10">
+        <input id="global-search" type="text" onkeyup="handleGlobalSearch()" placeholder="Search subjects, chapters, or specific classes..." class="w-full bg-[#151e32]/90 backdrop-blur-md border border-slate-600 rounded-full py-4 pl-12 pr-6 text-white focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 shadow-2xl transition text-sm">
+        <i class="fa-solid fa-magnifying-glass absolute left-5 top-[18px] text-slate-400"></i>
+      </div>
+
+      <h2 id="subjects-title" class="text-center text-slate-300 font-medium tracking-widest mb-8 uppercase text-sm">Subjects</h2>
+      
+      <!-- Default Grid (Shows when search is empty) -->
       <div id="subjects-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 justify-center w-full"></div>
+
+      <!-- Search Results Grid (Shows when typing) -->
+      <div id="search-results-grid" class="hidden grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 w-full"></div>
     </div>
 
+    <!-- STATE 2: Chapters Grid -->
     <div id="state-chapters" class="hidden">
       <div class="flex items-center mb-8 relative">
         <button onclick="renderSubjects()" class="absolute left-0 bg-emerald-900/40 text-emerald-400 border border-emerald-700/50 hover:bg-emerald-800 px-4 py-1.5 rounded-full text-sm font-bold transition flex items-center space-x-2"><i class="fa-solid fa-arrow-left"></i><span>Back</span></button>
@@ -217,31 +229,26 @@
       <div id="chapters-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 w-full"></div>
     </div>
 
-    <!-- STATE 3: Classes Grid (With Search Bar) -->
+    <!-- STATE 3: Classes Grid (Cleaned up, no local search bar) -->
     <div id="state-classes" class="hidden">
-      <div class="flex items-center mb-6 relative">
+      <div class="flex items-center mb-8 relative">
         <button onclick="document.getElementById('state-classes').classList.add('hidden'); document.getElementById('state-chapters').classList.remove('hidden'); window.saveNavigationState({view: 'chapters', subject: document.getElementById('chapter-view-title').innerText});" class="absolute left-0 bg-emerald-900/40 text-emerald-400 border border-emerald-700/50 hover:bg-emerald-800 px-4 py-1.5 rounded-full text-sm font-bold transition flex items-center space-x-2 z-10"><i class="fa-solid fa-arrow-left"></i><span>Back</span></button>
         <div class="w-full text-center">
           <h2 id="class-view-title" class="text-2xl font-bold text-purple-400 drop-shadow-md"></h2>
           <p class="text-slate-400 text-sm mt-1">Classes</p>
         </div>
       </div>
-      
-      <!-- Instant Search Bar -->
-      <div class="mb-8 relative max-w-md mx-auto">
-        <input id="search-classes" type="text" onkeyup="filterClasses()" placeholder="Search class by topic..." class="w-full bg-[#151e32] border border-slate-700 rounded-xl py-3 pl-11 pr-4 text-white focus:outline-none focus:border-indigo-500 shadow-lg transition">
-        <i class="fa-solid fa-magnifying-glass absolute left-4 top-[14px] text-slate-400"></i>
-      </div>
-
       <div id="classes-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 w-full"></div>
     </div>
 
+    <!-- STATE 4: Video Dashboard -->
     <div id="state-video" class="hidden bg-[#0b1121] border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
       <div class="bg-[#151e32] p-4 flex items-center border-b border-slate-800">
         <button onclick="document.getElementById('state-video').classList.add('hidden'); document.getElementById('state-classes').classList.remove('hidden'); document.getElementById('main-video-iframe').src=''; window.saveNavigationState({view: 'classes', subject: window.currentSubjectCache, chapter: document.getElementById('class-view-title').innerText}); renderClasses(window.currentSubjectCache, document.getElementById('class-view-title').innerText);" class="text-slate-400 hover:text-white mr-4"><i class="fa-solid fa-arrow-left text-xl"></i></button>
         <h2 id="dash-video-title" class="font-bold text-lg text-slate-200"></h2>
       </div>
 
+      <!-- FULL NATIVE CONTROLS ALLOWED -->
       <div class="relative w-full aspect-video bg-black">
         <iframe id="main-video-iframe" class="w-full h-full" src="" frameborder="0" allowfullscreen></iframe>
       </div>
@@ -264,7 +271,7 @@
   <script>
     window.currentSubjectCache = ""; 
 
-    // Visual Progress Local Storage Logic
+    // --- VISUAL PROGRESS LOGIC ---
     window.markAsWatched = (videoId) => {
       let watched = JSON.parse(localStorage.getItem("watchedClasses") || "[]");
       if (!watched.includes(videoId)) {
@@ -275,17 +282,6 @@
     window.hasWatched = (videoId) => {
       let watched = JSON.parse(localStorage.getItem("watchedClasses") || "[]");
       return watched.includes(videoId);
-    };
-
-    // Instant Search Logic
-    window.filterClasses = () => {
-      const query = document.getElementById("search-classes").value.toLowerCase();
-      const cards = document.querySelectorAll(".class-card-item");
-      cards.forEach(card => {
-        const title = card.getAttribute("data-title").toLowerCase();
-        if (title.includes(query)) card.style.display = "flex";
-        else card.style.display = "none";
-      });
     };
 
     function hideAllStates() { ['state-subjects', 'state-chapters', 'state-classes', 'state-video'].forEach(id => { document.getElementById(id).classList.add("hidden"); }); window.scrollTo(0,0); }
@@ -305,10 +301,84 @@
       }
     };
 
+    // --- GLOBAL SEARCH LOGIC ---
+    window.handleGlobalSearch = () => {
+      const query = document.getElementById("global-search").value.toLowerCase().trim();
+      const defaultGrid = document.getElementById("subjects-grid");
+      const searchGrid = document.getElementById("search-results-grid");
+      const title = document.getElementById("subjects-title");
+
+      if (!query) {
+        defaultGrid.style.display = "grid";
+        searchGrid.style.display = "none";
+        searchGrid.innerHTML = "";
+        title.innerText = "Subjects";
+        return;
+      }
+
+      defaultGrid.style.display = "none";
+      searchGrid.style.display = "grid";
+      title.innerText = "Search Results";
+      searchGrid.innerHTML = "";
+
+      // Instantly scan all classes, chapters, and subjects for the keyword
+      const matchedClasses = window.courseData().filter(c => 
+        c.subject.toLowerCase().includes(query) || 
+        c.chapter.toLowerCase().includes(query) || 
+        c.class_title.toLowerCase().includes(query)
+      ).sort((a, b) => a.class_title.localeCompare(b.class_title, undefined, { numeric: true, sensitivity: 'base' }));
+
+      if (matchedClasses.length === 0) {
+        searchGrid.innerHTML = `<div class="col-span-full text-center text-slate-400 py-10">No classes found matching "${query}"</div>`;
+        return;
+      }
+
+      matchedClasses.forEach(cls => {
+        const thumbUrl = `https://img.youtube.com/vi/${cls.youtube_id}/maxresdefault.jpg`;
+        const isWatched = window.hasWatched(cls.youtube_id);
+        const card = document.createElement("div");
+        card.className = "bg-[#151e32] border border-slate-800 hover:border-indigo-600/50 rounded-xl overflow-hidden cursor-pointer group shadow-lg flex flex-col w-full relative transition";
+        
+        // Build the search result card with context badges
+        card.innerHTML = `
+          <div class="absolute top-2 left-2 flex flex-col gap-1 z-10 pointer-events-none">
+            <span class="text-[9px] font-bold bg-indigo-900/90 text-indigo-200 px-2 py-0.5 rounded shadow backdrop-blur-sm border border-indigo-700/50">${cls.subject}</span>
+            <span class="text-[9px] font-bold bg-emerald-900/90 text-emerald-200 px-2 py-0.5 rounded shadow backdrop-blur-sm border border-emerald-700/50">${cls.chapter.split(':')[1] || cls.chapter}</span>
+          </div>
+          ${isWatched ? '<div class="absolute top-2 right-2 bg-emerald-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shadow-md z-10" title="Watched"><i class="fa-solid fa-check"></i></div>' : ''}
+          <div class="relative w-full aspect-video bg-black overflow-hidden">
+            <img src="${thumbUrl}" loading="lazy" class="w-full h-full object-cover ${isWatched ? 'opacity-50' : 'opacity-80'} group-hover:opacity-100 group-hover:scale-105 transition duration-500" onerror="this.src='https://images.unsplash.com/photo-1633356122544-f134324a6cee?q=80&w=600&auto=format&fit=crop';">
+            <div class="absolute inset-0 flex items-center justify-center">
+               <div class="w-12 h-12 bg-red-600/90 rounded-full flex items-center justify-center text-white shadow-xl shadow-red-900/50 group-hover:scale-110 transition"><i class="fa-solid fa-play ml-1"></i></div>
+            </div>
+          </div>
+          <div class="p-4 flex-grow flex flex-col justify-between bg-gradient-to-b from-[#151e32] to-[#0b1121]">
+            <h4 class="font-bold text-sm ${isWatched ? 'text-slate-400' : 'text-slate-200'} leading-snug">${cls.class_title}</h4>
+          </div>
+        `;
+        // When clicked from search, launch video AND load the rest of that specific chapter's playlist
+        card.onclick = () => {
+          const chapClasses = window.courseData().filter(c => c.subject === cls.subject && c.chapter === cls.chapter).sort((a, b) => a.class_title.localeCompare(b.class_title, undefined, { numeric: true, sensitivity: 'base' }));
+          document.getElementById('class-view-title').innerText = cls.chapter;
+          window.currentSubjectCache = cls.subject;
+          launchVideoDashboard(cls, chapClasses);
+        };
+        searchGrid.appendChild(card);
+      });
+    };
+
     window.renderSubjects = (save = true) => {
       hideAllStates();
       if (save) window.saveNavigationState({ view: 'subjects' });
-      const container = document.getElementById("subjects-grid"); container.innerHTML = "";
+      document.getElementById("global-search").value = "";
+      document.getElementById("subjects-title").innerText = "Subjects";
+      
+      const container = document.getElementById("subjects-grid"); 
+      const searchGrid = document.getElementById("search-results-grid");
+      container.innerHTML = "";
+      container.style.display = "grid";
+      searchGrid.style.display = "none";
+
       const uniqueSubjects = [...new Set(window.courseData().map(c => c.subject))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
       uniqueSubjects.forEach(sub => {
         let bgGrad = "from-slate-700 to-slate-900"; let textCol = "text-yellow-400";
@@ -316,6 +386,7 @@
         else if (sub.includes("গণিত")) { bgGrad = "from-[#8a2387] via-[#e94057] to-[#0b1121]"; textCol = "text-amber-300"; } 
         else if (sub.includes("রসায়ন")) { bgGrad = "from-[#4b134f] via-[#c94b4b] to-[#0b1121]"; textCol = "text-white"; } 
         else if (sub.includes("জীব")) { bgGrad = "from-[#11998e] via-[#38ef7d] to-[#0b1121]"; textCol = "text-emerald-200"; }
+        
         const card = document.createElement("div");
         card.className = "bg-[#0f1629] rounded-2xl overflow-hidden cursor-pointer transform hover:scale-[1.03] transition duration-300 shadow-2xl flex flex-col border border-slate-700/50 w-full";
         card.innerHTML = `<div class="h-32 bg-gradient-to-b ${bgGrad} flex items-center justify-center text-center p-3 relative"><div class="absolute inset-0 bg-black/30"></div><h2 class="relative text-2xl font-extrabold ${textCol} drop-shadow-xl whitespace-pre-line leading-tight">${sub}</h2></div><div class="h-12 bg-[#151e32] flex items-center justify-center text-xs text-slate-400 font-medium">${sub}</div>`;
@@ -331,6 +402,7 @@
       document.getElementById("chapter-view-title").innerText = subjectName;
       const container = document.getElementById("chapters-grid"); container.innerHTML = "";
       const subjectClasses = window.courseData().filter(c => c.subject === subjectName);
+      
       const uniqueChapters = [...new Set(subjectClasses.map(c => c.chapter))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
       uniqueChapters.forEach(chap => {
         const card = document.createElement("div");
@@ -346,7 +418,6 @@
       if (save) window.saveNavigationState({ view: 'classes', subject: subjectName, chapter: chapterName });
       window.currentSubjectCache = subjectName;
       document.getElementById("class-view-title").innerText = chapterName;
-      document.getElementById("search-classes").value = ""; // Reset search
       
       const container = document.getElementById("classes-grid"); container.innerHTML = "";
       const chapClasses = window.courseData().filter(c => c.subject === subjectName && c.chapter === chapterName).sort((a, b) => a.class_title.localeCompare(b.class_title, undefined, { numeric: true, sensitivity: 'base' }));
@@ -355,14 +426,11 @@
         const thumbUrl = `https://img.youtube.com/vi/${cls.youtube_id}/maxresdefault.jpg`;
         const isWatched = window.hasWatched(cls.youtube_id);
         const card = document.createElement("div");
-        card.className = "class-card-item bg-[#151e32] border border-slate-800 hover:border-slate-600 rounded-xl overflow-hidden cursor-pointer group shadow-lg flex flex-col w-full relative";
-        card.setAttribute("data-title", cls.class_title);
+        card.className = "bg-[#151e32] border border-slate-800 hover:border-slate-600 rounded-xl overflow-hidden cursor-pointer group shadow-lg flex flex-col w-full relative";
         card.innerHTML = `
-          <!-- Watched Indicator -->
           ${isWatched ? '<div class="absolute top-2 right-2 bg-emerald-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shadow-md z-10" title="Watched"><i class="fa-solid fa-check"></i></div>' : ''}
-          
           <div class="relative w-full aspect-video bg-black overflow-hidden">
-            <!-- LAZY LOADING ADDED -->
+            <!-- LAZY LOADING -->
             <img src="${thumbUrl}" loading="lazy" class="w-full h-full object-cover ${isWatched ? 'opacity-60' : 'opacity-80'} group-hover:opacity-100 group-hover:scale-105 transition duration-500" onerror="this.src='https://images.unsplash.com/photo-1633356122544-f134324a6cee?q=80&w=600&auto=format&fit=crop';">
             <div class="absolute inset-0 flex items-center justify-center">
                <div class="w-12 h-12 bg-red-600/90 rounded-full flex items-center justify-center text-white shadow-xl shadow-red-900/50 group-hover:scale-110 transition"><i class="fa-solid fa-play ml-1"></i></div>
