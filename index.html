@@ -54,7 +54,7 @@
 
             // KICK-OUT TRIGGER
             if (dbSession && dbSession !== localSession && !window.isAuthAction) {
-              sessionStorage.removeItem("courseNavState"); // Clear memory on kick out
+              sessionStorage.removeItem("courseNavState"); 
               alert("SECURITY ALERT: Your account was logged in from another device. You have been disconnected.");
               signOut(auth);
               return;
@@ -72,7 +72,7 @@
         });
       } else {
         if(currentUnsubscribe) currentUnsubscribe();
-        sessionStorage.removeItem("courseNavState"); // Clear memory on logout
+        sessionStorage.removeItem("courseNavState"); 
         showAuthView();
       }
     });
@@ -136,7 +136,7 @@
         const querySnapshot = await getDocs(collection(db, "classes"));
         courseData = [];
         querySnapshot.forEach((doc) => { courseData.push(doc.data()); });
-        restoreNavigationState(); // Check memory before rendering default subjects
+        restoreNavigationState(); 
       } catch (error) {
         console.error("Access Denied", error);
       }
@@ -218,13 +218,13 @@
   <!-- Main Course Container -->
   <div id="view-course" class="hidden max-w-6xl mx-auto px-4 py-8 relative min-h-screen">
     
-    <!-- STATE 1: Subjects Grid (Perfectly Even) -->
+    <!-- STATE 1: Subjects Grid -->
     <div id="state-subjects" class="hidden">
       <h2 class="text-center text-slate-300 font-medium tracking-widest mb-8 uppercase text-sm">Subjects</h2>
       <div id="subjects-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 justify-center w-full"></div>
     </div>
 
-    <!-- STATE 2: Chapters Grid (Perfectly Even) -->
+    <!-- STATE 2: Chapters Grid -->
     <div id="state-chapters" class="hidden">
       <div class="flex items-center mb-8 relative">
         <button onclick="renderSubjects()" class="absolute left-0 bg-emerald-900/40 text-emerald-400 border border-emerald-700/50 hover:bg-emerald-800 px-4 py-1.5 rounded-full text-sm font-bold transition flex items-center space-x-2"><i class="fa-solid fa-arrow-left"></i><span>Back</span></button>
@@ -236,7 +236,7 @@
       <div id="chapters-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 w-full"></div>
     </div>
 
-    <!-- STATE 3: Classes Grid (Perfectly Even) -->
+    <!-- STATE 3: Classes Grid -->
     <div id="state-classes" class="hidden">
       <div class="flex items-center mb-8 relative">
         <button onclick="document.getElementById('state-classes').classList.add('hidden'); document.getElementById('state-chapters').classList.remove('hidden'); window.saveNavigationState({view: 'chapters', subject: document.getElementById('chapter-view-title').innerText});" class="absolute left-0 bg-emerald-900/40 text-emerald-400 border border-emerald-700/50 hover:bg-emerald-800 px-4 py-1.5 rounded-full text-sm font-bold transition flex items-center space-x-2"><i class="fa-solid fa-arrow-left"></i><span>Back</span></button>
@@ -255,7 +255,7 @@
         <h2 id="dash-video-title" class="font-bold text-lg text-slate-200"></h2>
       </div>
 
-      <!-- VIDEO PLAYER: Shields removed for full controls -->
+      <!-- VIDEO PLAYER -->
       <div class="relative w-full aspect-video bg-black">
         <iframe id="main-video-iframe" class="w-full h-full" src="" frameborder="0" allowfullscreen></iframe>
       </div>
@@ -290,9 +290,8 @@
   </div>
 
   <script>
-    window.currentSubjectCache = ""; // Quick memory for back button navigation
+    window.currentSubjectCache = ""; 
 
-    // View Toggles
     function hideAllStates() {
       ['state-subjects', 'state-chapters', 'state-classes', 'state-video'].forEach(id => {
         document.getElementById(id).classList.add("hidden");
@@ -337,7 +336,7 @@
       }
     };
 
-    // --- RENDER LOGIC WITH MEMORY ---
+    // --- ALPHANUMERIC SORTING ADDED ---
 
     window.renderSubjects = (save = true) => {
       hideAllStates();
@@ -346,7 +345,9 @@
       const container = document.getElementById("subjects-grid");
       container.innerHTML = "";
       
-      const uniqueSubjects = [...new Set(window.courseData().map(c => c.subject))];
+      // Sort subjects logically (e.g., Physics 1st Paper -> Physics 2nd Paper)
+      const uniqueSubjects = [...new Set(window.courseData().map(c => c.subject))]
+        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 
       uniqueSubjects.forEach(sub => {
         let bgGrad = "from-slate-700 to-slate-900"; let textCol = "text-yellow-400";
@@ -380,7 +381,10 @@
       container.innerHTML = "";
 
       const subjectClasses = window.courseData().filter(c => c.subject === subjectName);
-      const uniqueChapters = [...new Set(subjectClasses.map(c => c.chapter))];
+      
+      // Sort chapters sequentially (e.g., Chapter 01 -> Chapter 02)
+      const uniqueChapters = [...new Set(subjectClasses.map(c => c.chapter))]
+        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 
       uniqueChapters.forEach(chap => {
         const card = document.createElement("div");
@@ -404,7 +408,10 @@
       const container = document.getElementById("classes-grid");
       container.innerHTML = "";
 
-      const chapClasses = window.courseData().filter(c => c.subject === subjectName && c.chapter === chapterName);
+      // Sort classes sequentially (e.g., Class 01 -> Class 02)
+      const chapClasses = window.courseData()
+        .filter(c => c.subject === subjectName && c.chapter === chapterName)
+        .sort((a, b) => a.class_title.localeCompare(b.class_title, undefined, { numeric: true, sensitivity: 'base' }));
 
       chapClasses.forEach(cls => {
         const thumbUrl = `https://img.youtube.com/vi/${cls.youtube_id}/maxresdefault.jpg`;
@@ -437,7 +444,6 @@
       
       document.getElementById("dash-video-title").innerText = cls.class_title;
       
-      // Removed modestbranding and disablekb to allow native controls and fullscreen capability
       const secureUrl = `https://www.youtube.com/embed/${cls.youtube_id}?autoplay=1&rel=0&playsinline=1`;
       document.getElementById("main-video-iframe").src = secureUrl;
       
