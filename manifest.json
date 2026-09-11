@@ -1,0 +1,16 @@
+{
+  "name": "Varsity Admission 26",
+  "short_name": "Admission 26",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0b1121",
+  "theme_color": "#0b1121",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2997/2997300.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
